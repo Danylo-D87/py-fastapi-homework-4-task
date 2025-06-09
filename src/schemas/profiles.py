@@ -6,7 +6,7 @@ from validation import (
     validate_name,
     validate_image,
     validate_gender,
-    validate_birth_date
+    validate_birth_date,
 )
 from database.models.accounts import GenderEnum
 
@@ -27,6 +27,7 @@ class ProfileRequestSchema(BaseModel):
     - `info` (str): Additional information about the user.
     - `avatar` (UploadFile): Avatar image file.
     """
+
     first_name: str
     last_name: str
     gender: GenderEnum
@@ -34,8 +35,7 @@ class ProfileRequestSchema(BaseModel):
     info: str
     avatar: UploadFile
 
-
-    @field_validator('first_name')
+    @field_validator("first_name")
     @classmethod
     def validate_first_name_field(cls, v: str) -> str:
         """
@@ -48,7 +48,7 @@ class ProfileRequestSchema(BaseModel):
             raise HTTPException(status_code=422, detail=f"Invalid first_name: {e}")
         return v.lower()
 
-    @field_validator('last_name')
+    @field_validator("last_name")
     @classmethod
     def validate_last_name_field(cls, v: str) -> str:
         """
@@ -61,7 +61,7 @@ class ProfileRequestSchema(BaseModel):
             raise HTTPException(status_code=422, detail=f"Invalid last_name: {e}")
         return v.lower()
 
-    @field_validator('gender')
+    @field_validator("gender")
     @classmethod
     def validate_gender_field(cls, v: str) -> str:
         """
@@ -74,7 +74,7 @@ class ProfileRequestSchema(BaseModel):
             raise HTTPException(status_code=422, detail=f"Invalid gender: {e}")
         return v
 
-    @field_validator('date_of_birth')
+    @field_validator("date_of_birth")
     @classmethod
     def validate_birth_date_field(cls, v: date) -> date:
         """
@@ -88,7 +88,7 @@ class ProfileRequestSchema(BaseModel):
             raise HTTPException(status_code=422, detail=f"Invalid date_of_birth: {e}")
         return v
 
-    @field_validator('info')
+    @field_validator("info")
     @classmethod
     def validate_info_field(cls, v: str) -> str:
         """
@@ -96,10 +96,13 @@ class ProfileRequestSchema(BaseModel):
         Checks that the field is not empty and does not consist only of spaces.
         """
         if not v or v.strip() == "":
-            raise HTTPException(status_code=422, detail="Info field cannot be empty or contain only spaces.")
+            raise HTTPException(
+                status_code=422,
+                detail="Info field cannot be empty or contain only spaces.",
+            )
         return v
 
-    @field_validator('avatar')
+    @field_validator("avatar")
     @classmethod
     def validate_avatar_field(cls, v: UploadFile) -> UploadFile:
         """
@@ -128,6 +131,7 @@ class ProfileResponseSchema(BaseModel):
     - `info` (str): Additional information about the user.
     - `avatar` (HttpUrl): URL to the uploaded avatar.
     """
+
     id: int
     user_id: int
     first_name: str
@@ -135,4 +139,4 @@ class ProfileResponseSchema(BaseModel):
     gender: str
     date_of_birth: date
     info: str
-    avatar: str
+    avatar: HttpUrl

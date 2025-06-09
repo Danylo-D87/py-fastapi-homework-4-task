@@ -11,12 +11,22 @@ from security.interfaces import JWTAuthManagerInterface
 from schemas.profiles import ProfileRequestSchema, ProfileResponseSchema
 from database import get_db
 
-from database.models.accounts import UserModel, UserGroupEnum, UserProfileModel, GenderEnum
+from database.models.accounts import (
+    UserModel,
+    UserGroupEnum,
+    UserProfileModel,
+    GenderEnum,
+)
 from storages import S3StorageInterface
-from config import BaseAppSettings, get_settings, get_s3_storage_client, get_jwt_auth_manager
+from config import (
+    BaseAppSettings,
+    get_settings,
+    get_s3_storage_client,
+    get_jwt_auth_manager,
+)
 
 
-router = APIRouter(prefix="/users", tags=["Profiles"])
+router = APIRouter(prefix="/users", tags=["profiles"])
 
 
 async def get_current_user(
@@ -42,8 +52,7 @@ async def get_current_user(
 
     except TokenExpiredError:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired."
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Token has expired."
         )
     except InvalidTokenError:
         raise credentials_exception
@@ -60,21 +69,22 @@ async def get_current_user(
 
     if user is None:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found."
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found."
         )
     return user
 
 
-
 async def get_current_active_user(
-    current_user: Annotated[UserModel, Depends(get_current_user)]
+    current_user: Annotated[UserModel, Depends(get_current_user)],
 ) -> UserModel:
     """
     Ensures the retrieved user is active.
     """
     if not current_user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or not active.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found or not active.",
+        )
     return current_user
 
 
@@ -103,7 +113,7 @@ async def get_profile_request_payload(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Validation error: {e}"
+            detail=f"Validation error: {e}",
         )
 
 
@@ -129,7 +139,7 @@ async def create_user_profile(
     if current_user.id != user_id and not current_user.has_group(UserGroupEnum.ADMIN):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You don't have permission to edit this profile."
+            detail="You don't have permission to edit this profile.",
         )
 
     user_to_create_profile_for = await db_session.execute(
@@ -140,7 +150,7 @@ async def create_user_profile(
     if not target_user or not target_user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found or not active."
+            detail="User not found or not active.",
         )
 
     existing_profile = await db_session.execute(
@@ -149,22 +159,24 @@ async def create_user_profile(
     if existing_profile.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User already has a profile."
+            detail="User already has a profile.",
         )
 
     avatar_file: UploadFile = profile_data.avatar
-    file_extension = avatar_file.filename.split('.')[-1] if '.' in avatar_file.filename else 'jpg'
+    file_extension = (
+        avatar_file.filename.split(".")[-1] if "." in avatar_file.filename else "jpg"
+    )
     avatar_filename = f"{user_id}_avatar.{file_extension}"
-    avatar_path = f"avatars/{avatar_filename}" # Шлях у бакеті
+    avatar_path = f"avatars/{avatar_filename}"  # Шлях у бакеті
 
     try:
         file_content = await avatar_file.read()
         await s3_client.upload_file(avatar_path, file_content)
     except Exception as e:
-        print(f"Error uploading avatar to S3: {e}") # Для дебагу
+        print(f"Error uploading avatar to S3: {e}")  # Для дебагу
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to upload avatar. Please try again later."
+            detail="Failed to upload avatar. Please try again later.",
         )
 
     new_profile = UserProfileModel(
@@ -174,7 +186,7 @@ async def create_user_profile(
         gender=profile_data.gender,
         date_of_birth=profile_data.date_of_birth,
         info=profile_data.info,
-        avatar=avatar_path
+        avatar=avatar_path,
     )
 
     try:
@@ -185,7 +197,7 @@ async def create_user_profile(
         await db_session.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create profile. Please try again later."
+            detail="Failed to create profile. Please try again later.",
         )
 
     response_avatar_url = await s3_client.get_file_url(new_profile.avatar)
@@ -198,5 +210,5 @@ async def create_user_profile(
         gender=new_profile.gender,
         date_of_birth=new_profile.date_of_birth,
         info=new_profile.info,
-        avatar=response_avatar_url
+        avatar=response_avatar_url,
     )
