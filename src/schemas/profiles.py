@@ -1,6 +1,4 @@
 from datetime import date
-from typing import Literal
-
 from fastapi import UploadFile, Form, File, HTTPException
 from pydantic import BaseModel, field_validator, HttpUrl
 
@@ -10,29 +8,28 @@ from validation import (
     validate_gender,
     validate_birth_date
 )
-
-GENDER_OPTIONS = Literal["man", "woman"]
+from database.models.accounts import GenderEnum
 
 
 class ProfileRequestSchema(BaseModel):
     """
-    Схема запиту для створення профілю користувача.
+    Request schema for creating a user profile.
 
-    Ця схема описує очікувані дані для запиту на створення профілю.
-    Передбачається, що запит буде надсилатися у форматі `multipart/form-data`,
-    оскільки він включає файл (`UploadFile`) для аватара.
+    This schema describes the expected data for a profile creation request.
+    It is assumed that the request will be sent in `multipart/form-data` format,
+    as it includes a file (`UploadFile`) for the avatar.
 
-    Поля:
-    - `first_name` (str): Ім'я користувача.
-    - `last_name` (str): Прізвище користувача.
-    - `gender` (GENDER_OPTIONS): Стать користувача.
-    - `date_of_birth` (date): Дата народження користувача.
-    - `info` (str): Додаткова інформація про користувача.
-    - `avatar` (UploadFile): Файл зображення аватара.
+    Fields:
+    - `first_name` (str): User's first name.
+    - `last_name` (str): User's last name.
+    - `gender` (GENDER_OPTIONS): User's gender.
+    - `date_of_birth` (date): User's date of birth.
+    - `info` (str): Additional information about the user.
+    - `avatar` (UploadFile): Avatar image file.
     """
     first_name: str
     last_name: str
-    gender: GENDER_OPTIONS
+    gender: GenderEnum
     date_of_birth: date
     info: str
     avatar: UploadFile
@@ -42,8 +39,8 @@ class ProfileRequestSchema(BaseModel):
     @classmethod
     def validate_first_name_field(cls, v: str) -> str:
         """
-        Валідує ім'я користувача.
-        Використовує зовнішню функцію `validate_name` для перевірки.
+        Validates the user's first name.
+        Uses the external `validate_name` function for validation.
         """
         try:
             validate_name(v)
@@ -55,8 +52,8 @@ class ProfileRequestSchema(BaseModel):
     @classmethod
     def validate_last_name_field(cls, v: str) -> str:
         """
-        Валідує прізвище користувача.
-        Використовує зовнішню функцію `validate_name` для перевірки.
+        Validates the user's last name.
+        Uses the external `validate_name` function for validation.
         """
         try:
             validate_name(v)
@@ -68,8 +65,8 @@ class ProfileRequestSchema(BaseModel):
     @classmethod
     def validate_gender_field(cls, v: str) -> str:
         """
-        Валідує стать користувача.
-        Використовує зовнішню функцію `validate_gender` для перевірки.
+        Validates the user's gender.
+        Uses the external `validate_gender` function for validation.
         """
         try:
             validate_gender(v)
@@ -81,9 +78,9 @@ class ProfileRequestSchema(BaseModel):
     @classmethod
     def validate_birth_date_field(cls, v: date) -> date:
         """
-        Валідує дату народження користувача.
-        Використовує зовнішню функцію `validate_birth_date` для перевірки,
-        включаючи перевірку віку (щонайменше 18 років).
+        Validates the user's date of birth.
+        Uses the external `validate_birth_date` function for validation,
+        including age verification (at least 18 years old).
         """
         try:
             validate_birth_date(v)
@@ -95,8 +92,8 @@ class ProfileRequestSchema(BaseModel):
     @classmethod
     def validate_info_field(cls, v: str) -> str:
         """
-        Валідує поле "інформація".
-        Перевіряє, що поле не є порожнім і не складається лише з пробілів.
+        Validates the "info" field.
+        Checks that the field is not empty and does not consist only of spaces.
         """
         if not v or v.strip() == "":
             raise HTTPException(status_code=422, detail="Info field cannot be empty or contain only spaces.")
@@ -106,9 +103,9 @@ class ProfileRequestSchema(BaseModel):
     @classmethod
     def validate_avatar_field(cls, v: UploadFile) -> UploadFile:
         """
-        Валідує файл аватара.
-        Використовує зовнішню функцію `validate_image` для перевірки типу
-        файлу (JPG, JPEG, PNG) та його розміру (не більше 1 МБ).
+        Validates the avatar file.
+        Uses the external `validate_image` function to check the file type
+        (JPG, JPEG, PNG) and its size (not exceeding 1 MB).
         """
         try:
             validate_image(v)
@@ -119,17 +116,17 @@ class ProfileRequestSchema(BaseModel):
 
 class ProfileResponseSchema(BaseModel):
     """
-    Схема відповіді після успішного створення або отримання профілю користувача.
+    Response schema after successful creation or retrieval of a user profile.
 
-    Поля:
-    - `id` (int): Унікальний ідентифікатор профілю.
-    - `user_id` (int): Ідентифікатор користувача, якому належить профіль.
-    - `first_name` (str): Ім'я користувача.
-    - `last_name` (str): Прізвище користувача.
-    - `gender` (str): Стать користувача.
-    - `date_of_birth` (date): Дата народження користувача.
-    - `info` (str): Додаткова інформація про користувача.
-    - `avatar` (HttpUrl): URL до завантаженого аватара.
+    Fields:
+    - `id` (int): Unique profile identifier.
+    - `user_id` (int): ID of the user to whom the profile belongs.
+    - `first_name` (str): User's first name.
+    - `last_name` (str): User's last name.
+    - `gender` (str): User's gender.
+    - `date_of_birth` (date): User's date of birth.
+    - `info` (str): Additional information about the user.
+    - `avatar` (HttpUrl): URL to the uploaded avatar.
     """
     id: int
     user_id: int
@@ -138,4 +135,4 @@ class ProfileResponseSchema(BaseModel):
     gender: str
     date_of_birth: date
     info: str
-    avatar: HttpUrl
+    avatar: str

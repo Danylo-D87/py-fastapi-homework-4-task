@@ -8,10 +8,10 @@ from sqlalchemy.orm import selectinload
 from exceptions import InvalidTokenError, TokenExpiredError
 from security.http import get_token
 from security.interfaces import JWTAuthManagerInterface
-from src.schemas.profiles import ProfileRequestSchema, ProfileResponseSchema, GENDER_OPTIONS
+from schemas.profiles import ProfileRequestSchema, ProfileResponseSchema
 from database import get_db
 
-from database.models.accounts import UserModel, UserGroupEnum, UserProfileModel
+from database.models.accounts import UserModel, UserGroupEnum, UserProfileModel, GenderEnum
 from storages import S3StorageInterface
 from config import BaseAppSettings, get_settings, get_s3_storage_client, get_jwt_auth_manager
 
@@ -35,8 +35,6 @@ async def get_current_user(
     try:
         payload = jwt_manager.decode_access_token(token)
 
-        # !!! ЗМІНА ТУТ: Очікуємо "user_id" замість "sub" !!!
-        # Тести генерують токен з {"user_id": user.id}, тому ми шукаємо "user_id".
         user_id_from_token: int = payload.get("user_id")
 
         if user_id_from_token is None:
@@ -48,19 +46,14 @@ async def get_current_user(
             detail="Token has expired."
         )
     except InvalidTokenError:
-        # Ця помилка виникає, якщо токен невалідний (наприклад, підроблений)
         raise credentials_exception
     except Exception as e:
-        # Для дебагу: виводимо деталі непередбачених помилок при декодуванні JWT
         print(f"Error during JWT decoding in get_current_user: {e}")
         raise credentials_exception
 
-    # !!! ЗМІНА ТУТ: Додаємо eager loading для 'group' !!!
-    # Це вирішує помилку MissingGreenlet, забезпечуючи, що група користувача
-    # завантажується разом з ним, коли ви звертаєтеся до `current_user.has_group()`.
     user_result = await db_session.execute(
         select(UserModel)
-        .options(selectinload(UserModel.group)) # Завантажуємо групу одразу
+        .options(selectinload(UserModel.group))
         .filter(UserModel.id == user_id_from_token)
     )
     user = user_result.scalar_one_or_none()
@@ -68,7 +61,7 @@ async def get_current_user(
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found." # Або "Could not validate credentials" для відповідності вашим тестам, якщо вони очікують саме це.
+            detail="User not found."
         )
     return user
 
@@ -84,13 +77,11 @@ async def get_current_active_user(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or not active.")
     return current_user
 
-# --- Кінець інтегрованих залежностей для аутентифікації ---
-
 
 async def get_profile_request_payload(
     first_name: Annotated[str, Form()],
     last_name: Annotated[str, Form()],
-    gender: Annotated[GENDER_OPTIONS, Form()],
+    gender: Annotated[GenderEnum, Form()],
     date_of_birth: Annotated[date, Form()],
     info: Annotated[str, Form()],
     avatar: Annotated[UploadFile, File()],
@@ -135,14 +126,12 @@ async def create_user_profile(
     Ендпоінт для створення нового профілю користувача.
     """
 
-    # 1. Авторизація: Користувач може створити профіль тільки для себе, якщо він не адмін
     if current_user.id != user_id and not current_user.has_group(UserGroupEnum.ADMIN):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You don't have permission to edit this profile."
         )
 
-    # 2. Перевірка існування користувача та його активності
     user_to_create_profile_for = await db_session.execute(
         select(UserModel).filter(UserModel.id == user_id)
     )
@@ -154,7 +143,6 @@ async def create_user_profile(
             detail="User not found or not active."
         )
 
-    # 3. Перевірка, чи у користувача вже є профіль
     existing_profile = await db_session.execute(
         select(UserProfileModel).filter(UserProfileModel.user_id == user_id)
     )
@@ -164,7 +152,6 @@ async def create_user_profile(
             detail="User already has a profile."
         )
 
-    # 4. Завантаження аватара до S3 сховища
     avatar_file: UploadFile = profile_data.avatar
     file_extension = avatar_file.filename.split('.')[-1] if '.' in avatar_file.filename else 'jpg'
     avatar_filename = f"{user_id}_avatar.{file_extension}"
@@ -180,15 +167,14 @@ async def create_user_profile(
             detail="Failed to upload avatar. Please try again later."
         )
 
-    # 5. Створення профілю та зберігання в базі даних
     new_profile = UserProfileModel(
         user_id=user_id,
-        first_name=profile_data.first_name, # вже приведено до нижнього регістру валідатором Pydantic
-        last_name=profile_data.last_name,   # вже приведено до нижнього регістру валідатором Pydantic
-        gender=profile_data.gender,         # Вже рядок завдяки ProfileRequestSchema.Config.use_enum_values
+        first_name=profile_data.first_name,
+        last_name=profile_data.last_name,
+        gender=profile_data.gender,
         date_of_birth=profile_data.date_of_birth,
         info=profile_data.info,
-        avatar=avatar_path                  # Зберігаємо шлях/ключ
+        avatar=avatar_path
     )
 
     try:
@@ -197,14 +183,11 @@ async def create_user_profile(
         await db_session.refresh(new_profile)
     except Exception as e:
         await db_session.rollback()
-        print(f"Error saving profile to DB: {e}") # Для дебагу
-        # Залишаємо опціональну логіку видалення аватара
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create profile. Please try again later."
         )
 
-    # 6. Формування відповіді
     response_avatar_url = await s3_client.get_file_url(new_profile.avatar)
 
     return ProfileResponseSchema(
@@ -212,8 +195,8 @@ async def create_user_profile(
         user_id=new_profile.user_id,
         first_name=new_profile.first_name,
         last_name=new_profile.last_name,
-        gender=new_profile.gender,             # Вже рядок
-        date_of_birth=str(new_profile.date_of_birth), # ЗМІНА ТУТ: конвертуємо в рядок
+        gender=new_profile.gender,
+        date_of_birth=new_profile.date_of_birth,
         info=new_profile.info,
         avatar=response_avatar_url
     )
