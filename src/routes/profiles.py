@@ -89,21 +89,44 @@ async def get_current_active_user(
 
 
 async def get_profile_request_payload(
-    first_name: Annotated[str, Form()],
-    last_name: Annotated[str, Form()],
-    gender: Annotated[GenderEnum, Form()],
-    date_of_birth: Annotated[date, Form()],
-    info: Annotated[str, Form()],
-    avatar: Annotated[UploadFile, File()],
+        first_name: Annotated[str, Form()],
+        last_name: Annotated[str, Form()],
+        gender: Annotated[str, Form()],
+        date_of_birth: Annotated[date, Form()],
+        info: Annotated[str, Form()],
+        avatar: Annotated[UploadFile, File()],
 ) -> ProfileRequestSchema:
     """
     Залежність для збору та валідації даних профілю з multipart/form-data.
     """
     try:
+        # Валідація gender
+        try:
+            gender_enum = GenderEnum(gender)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Gender must be one of: {[e.value for e in GenderEnum]}"
+            )
+        # Валідація date_of_birth
+        if isinstance(date_of_birth, str):
+            try:
+                date_of_birth = date.fromisoformat(date_of_birth)
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Invalid date format. Use YYYY-MM-DD"
+                )
+        # Валідація avatar
+        if not avatar.content_type.startswith('image/'):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="File must be an image"
+            )
         return ProfileRequestSchema(
             first_name=first_name,
             last_name=last_name,
-            gender=gender,
+            gender=gender_enum,
             date_of_birth=date_of_birth,
             info=info,
             avatar=avatar,
@@ -113,8 +136,9 @@ async def get_profile_request_payload(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Validation error: {e}",
+            detail=f"Validation error: {str(e)}"
         )
+
 
 
 @router.post(
@@ -167,13 +191,12 @@ async def create_user_profile(
         avatar_file.filename.split(".")[-1] if "." in avatar_file.filename else "jpg"
     )
     avatar_filename = f"{user_id}_avatar.{file_extension}"
-    avatar_path = f"avatars/{avatar_filename}"  # Шлях у бакеті
+    avatar_path = f"avatars/{avatar_filename}"
 
     try:
         file_content = await avatar_file.read()
         await s3_client.upload_file(avatar_path, file_content)
     except Exception as e:
-        print(f"Error uploading avatar to S3: {e}")  # Для дебагу
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to upload avatar. Please try again later.",
