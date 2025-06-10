@@ -97,10 +97,9 @@ async def get_profile_request_payload(
         avatar: Annotated[UploadFile, File()],
 ) -> ProfileRequestSchema:
     """
-    Залежність для збору та валідації даних профілю з multipart/form-data.
+    Dependency for collecting and validating profile data from multipart/form-data.
     """
     try:
-        # Валідація gender
         try:
             gender_enum = GenderEnum(gender)
         except ValueError:
@@ -108,7 +107,6 @@ async def get_profile_request_payload(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=f"Gender must be one of: {[e.value for e in GenderEnum]}"
             )
-        # Валідація date_of_birth
         if isinstance(date_of_birth, str):
             try:
                 date_of_birth = date.fromisoformat(date_of_birth)
@@ -117,7 +115,6 @@ async def get_profile_request_payload(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail="Invalid date format. Use YYYY-MM-DD"
                 )
-        # Валідація avatar
         if not avatar.content_type.startswith('image/'):
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -157,7 +154,7 @@ async def create_user_profile(
     settings: BaseAppSettings = Depends(get_settings),
 ):
     """
-    Ендпоінт для створення нового профілю користувача.
+    Endpoint for creating a new user profile.
     """
 
     if current_user.id != user_id and not current_user.has_group(UserGroupEnum.ADMIN):

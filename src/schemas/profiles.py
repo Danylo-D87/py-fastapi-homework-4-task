@@ -37,84 +37,84 @@ class ProfileRequestSchema(BaseModel):
 
     @field_validator("first_name")
     @classmethod
-    def validate_first_name_field(cls, v: str) -> str:
+    def validate_first_name_field(cls, first_name: str) -> str:
         """
         Validates the user's first name.
         Uses the external `validate_name` function for validation.
         """
         try:
-            validate_name(v)
+            validate_name(first_name)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=f"Invalid first_name: {e}")
-        return v.lower()
+        return first_name.lower()
 
     @field_validator("last_name")
     @classmethod
-    def validate_last_name_field(cls, v: str) -> str:
+    def validate_last_name_field(cls, last_name: str) -> str:
         """
         Validates the user's last name.
         Uses the external `validate_name` function for validation.
         """
         try:
-            validate_name(v)
+            validate_name(last_name)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=f"Invalid last_name: {e}")
-        return v.lower()
+        return last_name.lower()
 
     @field_validator("gender")
     @classmethod
-    def validate_gender_field(cls, v: str) -> str:
+    def validate_gender_field(cls, gender: str) -> str:
         """
         Validates the user's gender.
         Uses the external `validate_gender` function for validation.
         """
         try:
-            validate_gender(v)
+            validate_gender(gender)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=f"Invalid gender: {e}")
-        return v
+        return gender
 
     @field_validator("date_of_birth")
     @classmethod
-    def validate_birth_date_field(cls, v: date) -> date:
+    def validate_birth_date_field(cls, date_of_birth: date) -> date:
         """
         Validates the user's date of birth.
         Uses the external `validate_birth_date` function for validation,
         including age verification (at least 18 years old).
         """
         try:
-            validate_birth_date(v)
+            validate_birth_date(date_of_birth)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=f"Invalid date_of_birth: {e}")
-        return v
+        return date_of_birth
 
     @field_validator("info")
     @classmethod
-    def validate_info_field(cls, v: str) -> str:
+    def validate_info_field(cls, info: str) -> str:
         """
         Validates the "info" field.
         Checks that the field is not empty and does not consist only of spaces.
         """
-        if not v or v.strip() == "":
+        if not info or info.strip() == "":
             raise HTTPException(
                 status_code=422,
                 detail="Info field cannot be empty or contain only spaces.",
             )
-        return v
+        return info
 
     @field_validator("avatar")
     @classmethod
-    def validate_avatar_field(cls, v: UploadFile) -> UploadFile:
+    def validate_avatar_field(cls, avatar: UploadFile) -> UploadFile:
         """
         Validates the avatar file.
         Uses the external `validate_image` function to check the file type
         (JPG, JPEG, PNG) and its size (not exceeding 1 MB).
         """
         try:
-            validate_image(v)
+            validate_image(avatar)
         except ValueError as e:
             raise HTTPException(status_code=422, detail=f"Invalid avatar: {e}")
-        return v
+        return avatar
 
 
 class ProfileResponseSchema(BaseModel):
